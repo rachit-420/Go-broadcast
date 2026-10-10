@@ -22,7 +22,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	client := &Client{conn: conn}
 	clientPool.addClient(client)
-	defer handleClose(client)
+	defer client.close()
 
 	for {
 		messageType, message, err := client.conn.ReadMessage()
@@ -42,14 +42,7 @@ func broadcast(message []byte, messageType int) {
 	for _, client := range clients {
 		if err := client.writeMessage(messageType, message); err != nil {
 			fmt.Println("Write error:", err)
-			handleClose(client)
+			client.close()
 		}
-	}
-}
-
-func handleClose(client *Client) {
-	clientPool.removeClient(client)
-	if err := client.conn.Close(); err != nil {
-		fmt.Println("Close error:", err)
 	}
 }
