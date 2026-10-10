@@ -10,91 +10,99 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type Container struct {
-	mu   sync.Mutex
-	pool map[*Client]bool
-}
-
 type Client struct {
 	mu   sync.Mutex
 	conn *websocket.Conn
 }
 
-func (p *Container) inc(conn *Client) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.pool[conn] = true
+type ClientPool struct {
+	mu      sync.Mutex
+	clients map[*Client]bool
 }
 
-func (p *Container) lockAndSlice() []*Client {
+func (p *ClientPool) addClient(client *Client) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return slices.Collect(maps.Keys(p.pool))
+
+	p.clients[client] = true
 }
 
-func (p *Container) del(conn *Client) {
+func (p *ClientPool) snapshotClients() []*Client {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	delete(p.pool, conn)
+
+	return slices.Collect(maps.Keys(p.clients))
 }
 
-func (c *Client) writeMessage(message []byte, messageType int) error {
+func (p *ClientPool) removeClient(client *Client) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	delete(p.clients, client)
+}
+
+func (c *Client) writeMessage(messageType int, message []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	return c.conn.WriteMessage(messageType, message)
 }
 
-var upgarder = websocket.Upgrader{
+var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
 
-var connPool = Container{
-	pool: make(map[*Client]bool),
+var clientPool = ClientPool{
+	clients: make(map[*Client]bool),
 }
 
 func main() {
 	http.HandleFunc("/ws", handleWebSocket)
+
 	fmt.Println("Server running on http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		fmt.Println("Server error:", err)
+	}
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgarder.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Upgrade error:", err)
 		return
 	}
-	client := &Client{
-		conn: conn,
-	}
+
+	client := &Client{conn: conn}
+	clientPool.addClient(client)
 	defer handleClose(client)
-	connPool.inc(client)
 
 	for {
 		messageType, message, err := client.conn.ReadMessage()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Read error:", err)
 			return
 		}
-		fmt.Println("Received", string(message))
-		broadCast(message, messageType)
+
+		fmt.Println("Received:", string(message))
+		broadcast(message, messageType)
 	}
 }
 
-func broadCast(message []byte, messageType int) {
-	clients := connPool.lockAndSlice()
-	for _, conn := range clients {
-		err := conn.writeMessage(message, messageType)
-		if err != nil {
-			fmt.Println(err)
-			return
+func broadcast(message []byte, messageType int) {
+	clients := clientPool.snapshotClients()
+
+	for _, client := range clients {
+		if err := client.writeMessage(messageType, message); err != nil {
+			fmt.Println("Write error:", err)
 		}
 	}
 }
 
-func handleClose(conn *Client) {
-	connPool.del(conn)
-	conn.conn.Close()
+func handleClose(client *Client) {
+	clientPool.removeClient(client)
+	if err := client.conn.Close(); err != nil {
+		fmt.Println("Close error:", err)
+	}
 }
