@@ -1,26 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WebSocket chat</title>
+    <title>The room</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>WebSocket messages</h1>
-    <p id="connection-status" role="status">Enter your name to connect.</p>
-    <ul id="messages" aria-live="polite"></ul>
-    <form id="name-form">
-        <label for="name-input">Name</label>
-        <input id="name-input" name="username" type="text" autocomplete="name" required>
-        <button type="submit">Connect</button>
-    </form>
-    <form id="message-form" hidden>
-        <label for="message-input">Message</label>
-        <input id="message-input" name="message" type="text" autocomplete="off" required disabled>
-        <button id="send-button" type="submit" disabled>Send</button>
-    </form>
+    <div class="shell">
+        <section id="join-panel" class="panel join-panel">
+            <header class="join-header">
+                <p class="kicker">localhost:8080</p>
+                <h1>The room</h1>
+                <p class="sub">Pick a name and you’re in.</p>
+            </header>
+            <form id="name-form" class="composer composer--join">
+                <label class="sr-only" for="name-input">Name</label>
+                <input id="name-input" name="username" type="text" autocomplete="nickname" maxlength="32" placeholder="Your name" required>
+                <button id="connect-button" type="submit">Enter</button>
+            </form>
+            <p id="connection-status" class="status" role="status">Waiting for a name.</p>
+        </section>
 
-<script src="app.js" defer></script>
+        <section id="chat-panel" class="panel chat-panel" hidden>
+            <header class="chat-header">
+                <div>
+                    <p class="kicker"><span class="live-dot" aria-hidden="true"></span> Live</p>
+                    <h1>The room</h1>
+                </div>
+                <div class="chat-meta">
+                    <p id="you-label" class="you-label"></p>
+                    <button id="leave-button" type="button">Leave</button>
+                </div>
+            </header>
+            <ol id="messages" class="transcript" aria-live="polite"></ol>
+            <form id="message-form" class="composer">
+                <label class="sr-only" for="message-input">Message</label>
+                <input id="message-input" name="message" type="text" autocomplete="off" placeholder="Write a message" required disabled>
+                <button id="send-button" type="submit" disabled>Send</button>
+            </form>
+        </section>
+    </div>
+    <script src="app.js" defer></script>
 </body>
 </html>
