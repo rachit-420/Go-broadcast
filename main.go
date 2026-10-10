@@ -12,20 +12,36 @@ import (
 
 type Container struct {
 	mu   sync.Mutex
-	pool map[*websocket.Conn]bool
+	pool map[*Client]bool
 }
 
-func (p *Container) inc(conn *websocket.Conn) {
+type Client struct {
+	mu   sync.Mutex
+	conn *websocket.Conn
+}
+
+func (p *Container) inc(conn *Client) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.pool[conn] = true
 }
 
-func (p *Container) lockAndSlice() []*websocket.Conn {
+func (p *Container) lockAndSlice() []*Client {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	clients := slices.Collect(maps.Keys(p.pool))
-	return clients
+	return slices.Collect(maps.Keys(p.pool))
+}
+
+func (p *Container) del(conn *Client) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.pool, conn)
+}
+
+func (c *Client) writeMessage(message []byte, messageType int) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn.WriteMessage(messageType, message)
 }
 
 var upgarder = websocket.Upgrader{
@@ -35,7 +51,7 @@ var upgarder = websocket.Upgrader{
 }
 
 var connPool = Container{
-	pool: make(map[*websocket.Conn]bool),
+	pool: make(map[*Client]bool),
 }
 
 func main() {
@@ -50,24 +66,27 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	defer handleClose(conn)
-	connPool.inc(conn)
+	client := &Client{
+		conn: conn,
+	}
+	defer handleClose(client)
+	connPool.inc(client)
 
 	for {
-		messageType, message, err := conn.ReadMessage()
+		messageType, message, err := client.conn.ReadMessage()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		fmt.Println("Received", string(message))
-		broadCast(message, messageType, err)
+		broadCast(message, messageType)
 	}
 }
 
-func broadCast(message []byte, messageType int, err error) {
+func broadCast(message []byte, messageType int) {
 	clients := connPool.lockAndSlice()
 	for _, conn := range clients {
-		err = conn.WriteMessage(messageType, message)
+		err := conn.writeMessage(message, messageType)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -75,7 +94,7 @@ func broadCast(message []byte, messageType int, err error) {
 	}
 }
 
-func handleClose(conn *websocket.Conn) {
-	delete(connPool.pool, conn)
-	conn.Close()
+func handleClose(conn *Client) {
+	connPool.del(conn)
+	conn.conn.Close()
 }
