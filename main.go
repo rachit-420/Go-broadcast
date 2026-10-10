@@ -2,10 +2,31 @@ package main
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
+
+type Container struct {
+	mu   sync.Mutex
+	pool map[*websocket.Conn]bool
+}
+
+func (p *Container) inc(conn *websocket.Conn) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.pool[conn] = true
+}
+
+func (p *Container) lockAndSlice() []*websocket.Conn {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	clients := slices.Collect(maps.Keys(p.pool))
+	return clients
+}
 
 var upgarder = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -13,7 +34,9 @@ var upgarder = websocket.Upgrader{
 	},
 }
 
-var pool = make(map[*websocket.Conn]bool)
+var connPool = Container{
+	pool: make(map[*websocket.Conn]bool),
+}
 
 func main() {
 	http.HandleFunc("/ws", handleWebSocket)
@@ -28,7 +51,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer handleClose(conn)
-	pool[conn] = true
+	connPool.inc(conn)
 
 	for {
 		messageType, message, err := conn.ReadMessage()
@@ -42,7 +65,8 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func broadCast(message []byte, messageType int, err error) {
-	for conn := range pool {
+	clients := connPool.lockAndSlice()
+	for _, conn := range clients {
 		err = conn.WriteMessage(messageType, message)
 		if err != nil {
 			fmt.Println(err)
@@ -52,6 +76,6 @@ func broadCast(message []byte, messageType int, err error) {
 }
 
 func handleClose(conn *websocket.Conn) {
-	delete(pool, conn)
+	delete(connPool.pool, conn)
 	conn.Close()
 }
