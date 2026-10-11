@@ -25,6 +25,7 @@ nameForm.addEventListener("submit", (event) => {
 
     username = nextName;
     leaving = false;
+    let connected = false;
     messages.replaceChildren();
     setStatus("Connecting…");
     connectButton.disabled = true;
@@ -34,6 +35,7 @@ nameForm.addEventListener("submit", (event) => {
     socket = new WebSocket(url);
 
     socket.onopen = () => {
+        connected = true;
         joinPanel.hidden = true;
         chatPanel.hidden = false;
         youLabel.textContent = username;
@@ -70,12 +72,13 @@ nameForm.addEventListener("submit", (event) => {
         sendButton.disabled = true;
         chatPanel.hidden = true;
         joinPanel.hidden = false;
-        setStatus(
-            leaving
-                ? "You left. Enter a name to go back in."
-                : "Disconnected. Enter a name to reconnect.",
-            !leaving
-        );
+        if (leaving) {
+            setStatus("You left. Enter a name to go back in.");
+        } else if (!connected) {
+            setStatus("Couldn’t connect. That name might already be taken.", true);
+        } else {
+            setStatus("Disconnected. Enter a name to reconnect.", true);
+        }
         leaving = false;
         nameInput.focus();
     };
@@ -107,7 +110,8 @@ function isChatMessage(data) {
         typeof data === "object" &&
         typeof data.type === "string" &&
         typeof data.userName === "string" &&
-        typeof data.message === "string"
+        typeof data.message === "string" &&
+        typeof data.timestamp === "string"
     );
 }
 
@@ -122,7 +126,7 @@ function renderMessage(data) {
         return;
     }
 
-    appendBubble(data.userName, data.message, data.userName === username);
+    appendBubble(data.userName, data.message, data.userName === username, data.timestamp);
 }
 
 function appendEvent(kind, text) {
@@ -133,7 +137,7 @@ function appendEvent(kind, text) {
     scrollToLatest();
 }
 
-function appendBubble(name, text, mine) {
+function appendBubble(name, text, mine, timestamp) {
     const item = document.createElement("li");
     item.className = mine ? "bubble-row bubble-row--mine" : "bubble-row";
 
@@ -148,13 +152,16 @@ function appendBubble(name, text, mine) {
     bubble.className = "bubble";
     bubble.textContent = text;
 
+    const sentAt = new Date(timestamp);
     const time = document.createElement("time");
     time.className = "bubble-time";
-    time.dateTime = new Date().toISOString();
-    time.textContent = new Date().toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-    });
+    time.dateTime = timestamp;
+    time.textContent = Number.isNaN(sentAt.getTime())
+        ? ""
+        : sentAt.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+        });
 
     const body = document.createElement("div");
     body.className = "bubble-body";
