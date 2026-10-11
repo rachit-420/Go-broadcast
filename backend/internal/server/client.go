@@ -1,10 +1,13 @@
-package main
+package server
 
 import (
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
+
+	"chat-server/internal/message"
+	"chat-server/internal/user"
 
 	"github.com/gorilla/websocket"
 )
@@ -26,13 +29,13 @@ func (c *Client) writeMessage(messageType int, message []byte) error {
 
 func (c *Client) close() {
 	c.closeOnce.Do(func() {
-		releaseUsername(c.username)
+		user.ReleaseUsername(c.username)
 		clientPool.removeClient(c)
 		if err := c.conn.Close(); err != nil {
 			fmt.Println("Close error:", err)
 		}
 		mssg := fmt.Sprintf("%s left the chat", c.username)
-		rawLeft := Message{
+		rawLeft := message.Message{
 			Type:      "Left",
 			Message:   mssg,
 			Username:  c.username,
@@ -44,7 +47,7 @@ func (c *Client) close() {
 }
 
 func sendClientHistory(client *Client) {
-	pastMessage := history.GetMessage()
+	pastMessage := message.History.GetMessage()
 	for _, rawMessage := range pastMessage {
 		mess, _ := json.Marshal(rawMessage)
 		if err := client.writeMessage(1, mess); err != nil {

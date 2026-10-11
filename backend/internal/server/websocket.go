@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	msg "chat-server/internal/message"
+	"chat-server/internal/user"
 
 	"github.com/gorilla/websocket"
 )
@@ -16,29 +19,45 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	client, ok := acceptClient(w, r)
+	if !ok {
+		return
+	}
+	defer client.close()
+
+	sendClientHistory(client)
+	if !announceJoin(client) {
+		return
+	}
+	readMessages(client)
+}
+
+func acceptClient(w http.ResponseWriter, r *http.Request) (*Client, bool) {
 	name := strings.TrimSpace(r.URL.Query().Get("username"))
 	roomName := strings.TrimSpace(r.URL.Query().Get("roomName"))
 	if name == "" {
 		sendError(w, "Username is required", http.StatusBadRequest)
-		return
+		return nil, false
 	}
-	if !claimUsername(name) {
+	if !user.ClaimUsername(name) {
 		sendError(w, "Username is taken. Please try other name", http.StatusBadRequest)
-		return
+		return nil, false
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println("Upgrade error:", err)
-		releaseUsername(name)
-		return
+		user.ReleaseUsername(name)
+		return nil, false
 	}
 	client := &Client{conn: conn, username: name, roomName: roomName}
 	clientPool.addClient(client)
-	defer client.close()
-	sendClientHistory(client)
-	mssg := fmt.Sprintf("%s Joined the chat", name)
-	rawGreeting := Message{
+	return client, true
+}
+
+func announceJoin(client *Client) bool {
+	mssg := fmt.Sprintf("%s Joined the chat", client.username)
+	rawGreeting := msg.Message{
 		Type:      "Joined",
 		Message:   mssg,
 		Username:  client.username,
@@ -47,10 +66,13 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	greeting, err := json.Marshal(rawGreeting)
 	if err != nil {
 		fmt.Println("Error will encoding:", err)
-		return
+		return false
 	}
 	sendNotification(greeting)
+	return true
+}
 
+func readMessages(client *Client) {
 	for {
 		messageType, rawMessage, err := client.conn.ReadMessage()
 		if err != nil {
@@ -58,13 +80,13 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		res := Message{
+		res := msg.Message{
 			Message:   string(rawMessage),
 			Username:  client.username,
 			Type:      "Message",
 			Timestamp: time.Now().UTC(),
 		}
-		history.AddMessage(res)
+		msg.History.AddMessage(res)
 		message, err := json.Marshal(res)
 		fmt.Println("Message is", string(message))
 		broadcast(message, messageType, client.roomName)

@@ -1,11 +1,11 @@
-package main
+package message
 
 import (
 	"sync"
 	"time"
 )
 
-var history = MessageHistory{
+var History = MessageHistory{
 	message: make([]Message, 0, 50),
 }
 
