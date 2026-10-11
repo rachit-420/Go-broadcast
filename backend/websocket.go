@@ -18,6 +18,7 @@ var upgrader = websocket.Upgrader{
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.URL.Query().Get("username"))
+	roomName := strings.TrimSpace(r.URL.Query().Get("roomName"))
 	if name == "" {
 		sendError(w, "Username is required", http.StatusBadRequest)
 		return
@@ -32,7 +33,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		releaseUsername(name)
 		return
 	}
-	client := &Client{conn: conn, username: name}
+	client := &Client{conn: conn, username: name, roomName: roomName}
 	clientPool.addClient(client)
 	defer client.close()
 	sendClientHistory(client)
@@ -66,12 +67,12 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		history.AddMessage(res)
 		message, err := json.Marshal(res)
 		fmt.Println("Message is", string(message))
-		broadcast(message, messageType)
+		broadcast(message, messageType, client.roomName)
 	}
 }
 
-func broadcast(message []byte, messageType int) {
-	clients := clientPool.snapshotClients()
+func broadcast(message []byte, messageType int, room string) {
+	clients := clientPool.getClientsByRoom(room)
 
 	for _, client := range clients {
 		if err := client.writeMessage(messageType, message); err != nil {

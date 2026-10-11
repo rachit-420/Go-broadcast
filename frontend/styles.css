@@ -291,6 +291,12 @@ input {
     opacity: 0.35;
 }
 
+.join-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
 .composer--join {
     background: var(--paper);
     border: 1px solid var(--line);

@@ -1,6 +1,8 @@
 const joinPanel = document.getElementById("join-panel");
 const chatPanel = document.getElementById("chat-panel");
 const nameForm = document.getElementById("name-form");
+const roomInput = document.getElementById("room-input");
+const roomTitle = document.getElementById("room-title");
 const nameInput = document.getElementById("name-input");
 const connectButton = document.getElementById("connect-button");
 const messageForm = document.getElementById("message-form");
@@ -13,16 +15,23 @@ const youLabel = document.getElementById("you-label");
 
 let socket;
 let username = "";
+let roomName = "";
 let leaving = false;
 
 nameForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    const nextRoom = roomInput.value.trim();
     const nextName = nameInput.value.trim();
+    if (!nextRoom) {
+        roomInput.focus();
+        return;
+    }
     if (!nextName || socket) {
         nameInput.focus();
         return;
     }
 
+    roomName = nextRoom;
     username = nextName;
     leaving = false;
     let connected = false;
@@ -32,12 +41,14 @@ nameForm.addEventListener("submit", (event) => {
 
     const url = new URL("ws://localhost:8080/ws");
     url.searchParams.set("username", username);
+    url.searchParams.set("roomName", roomName);
     socket = new WebSocket(url);
 
     socket.onopen = () => {
         connected = true;
         joinPanel.hidden = true;
         chatPanel.hidden = false;
+        roomTitle.textContent = roomName;
         youLabel.textContent = username;
         messageInput.disabled = false;
         sendButton.disabled = false;
@@ -80,7 +91,7 @@ nameForm.addEventListener("submit", (event) => {
             setStatus("Disconnected. Enter a name to reconnect.", true);
         }
         leaving = false;
-        nameInput.focus();
+        roomInput.focus();
     };
 });
 

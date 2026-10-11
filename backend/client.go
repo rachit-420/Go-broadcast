@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"time"
- 
+
 	"github.com/gorilla/websocket"
 )
 
@@ -14,6 +14,7 @@ type Client struct {
 	conn      *websocket.Conn
 	closeOnce sync.Once
 	username  string
+	roomName  string
 }
 
 func (c *Client) writeMessage(messageType int, message []byte) error {

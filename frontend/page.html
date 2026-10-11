@@ -12,21 +12,27 @@
             <header class="join-header">
                 <p class="kicker">localhost:8080</p>
                 <h1>The room</h1>
-                <p class="sub">Pick a name and you’re in.</p>
+                <p class="sub">Pick a room and a name.</p>
             </header>
-            <form id="name-form" class="composer composer--join">
-                <label class="sr-only" for="name-input">Name</label>
-                <input id="name-input" name="username" type="text" autocomplete="nickname" maxlength="32" placeholder="Your name" required>
-                <button id="connect-button" type="submit">Enter</button>
+            <form id="name-form" class="join-form">
+                <div class="composer composer--join">
+                    <label class="sr-only" for="room-input">Room</label>
+                    <input id="room-input" name="roomName" type="text" autocomplete="off" maxlength="32" placeholder="Room" required>
+                </div>
+                <div class="composer composer--join">
+                    <label class="sr-only" for="name-input">Name</label>
+                    <input id="name-input" name="username" type="text" autocomplete="nickname" maxlength="32" placeholder="Your name" required>
+                    <button id="connect-button" type="submit">Enter</button>
+                </div>
             </form>
-            <p id="connection-status" class="status" role="status">Waiting for a name.</p>
+            <p id="connection-status" class="status" role="status">Waiting for a room and a name.</p>
         </section>
 
         <section id="chat-panel" class="panel chat-panel" hidden>
             <header class="chat-header">
                 <div>
                     <p class="kicker"><span class="live-dot" aria-hidden="true"></span> Live</p>
-                    <h1>The room</h1>
+                    <h1 id="room-title">The room</h1>
                 </div>
                 <div class="chat-meta">
                     <p id="you-label" class="you-label"></p>
