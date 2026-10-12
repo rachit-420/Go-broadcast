@@ -42,12 +42,12 @@ func (c *Client) close() {
 			Timestamp: time.Now().UTC(),
 		}
 		leftMessage, _ := json.Marshal(rawLeft)
-		sendNotification(leftMessage)
+		sendNotification(leftMessage, c.roomName)
 	})
 }
 
 func sendClientHistory(client *Client) {
-	pastMessage := message.History.GetMessage()
+	pastMessage := message.History.GetMessage(client.roomName)
 	for _, rawMessage := range pastMessage {
 		mess, _ := json.Marshal(rawMessage)
 		if err := client.writeMessage(1, mess); err != nil {

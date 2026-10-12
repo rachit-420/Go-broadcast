@@ -68,7 +68,7 @@ func announceJoin(client *Client) bool {
 		fmt.Println("Error will encoding:", err)
 		return false
 	}
-	sendNotification(greeting)
+	sendNotification(greeting, client.roomName)
 	return true
 }
 
@@ -86,7 +86,7 @@ func readMessages(client *Client) {
 			Type:      "Message",
 			Timestamp: time.Now().UTC(),
 		}
-		msg.History.AddMessage(res)
+		msg.History.AddMessage(res, client.roomName)
 		message, err := json.Marshal(res)
 		fmt.Println("Message is", string(message))
 		broadcast(message, messageType, client.roomName)
@@ -104,10 +104,13 @@ func broadcast(message []byte, messageType int, room string) {
 	}
 }
 
-func sendNotification(message []byte) {
+func sendNotification(message []byte, room string) {
 	clients := clientPool.snapshotClients()
 
 	for _, client := range clients {
+		if client.roomName != room {
+			continue
+		}
 		if err := client.writeMessage(1, message); err != nil {
 			fmt.Println("Write error:", err)
 			client.close()
